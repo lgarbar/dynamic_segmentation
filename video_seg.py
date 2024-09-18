@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+    Project: Dynamic Segmentation
+    File: video_seg.py
+    Author: Daniel Garcia-Barnett
+    GitHub: https://github.com/lgarbar
+    Email: luis.garcia-barnett@nki.rfmh.org
+
+    Description: The video_seg.py script runs a video 
+    segmentation experiment using PsychoPy and PyGaze. The 
+    script defines visual stimuli and instructions, presents 
+    text and videos, detects spacebar presses, and records 
+    responses in a CSV file.
+
+    License:
+    MIT License
+"""
+
 from datetime import datetime
 import os
 import sys
@@ -29,21 +46,6 @@ try:
     logging.console.setLevel(logging.ERROR)
     print("Successfully set logging level")
 
-    import sounddevice as sd
-    print("Successfully imported sounddevice as sd")
-
-    # List available audio devices
-    print("Available audio devices:")
-    print(sd.query_devices())
-
-    # Set preferences for audio library
-    prefs.hardware['audioLib'] = ['pygame', 'sounddevice', 'PTB', 'pyo']  # Prioritize 'pygame' and 'sounddevice'
-    prefs.general['audioDevice'] = ['Built-in Output']
-
-    # Explicitly set the audio device to a known working device
-    audio_device_id = 5  # Change this to the ID of a known working device
-    prefs.hardware['audioDevice'] = [audio_device_id]
-
     ptp_num = input("Participant Number: ")
     output_fldr = os.path.join(os.path.dirname(__file__), 'output', ptp_num)
     os.makedirs(output_fldr, exist_ok=True)
@@ -65,18 +67,16 @@ try:
                 return eval(config['Experiment']['segmentation_order'])
             except (configparser.Error, KeyError, FileNotFoundError):
                 print("Warning: Could not read segmentation_order from config.ini. Using default order.")
-                return [(0, 0), (1, 0), (1, 1), (1, 0)]  # Default order
+                return [(0, 0), (1, 0), (1, 1), (1, 0)] 
 
-    # Argument parsing
     parser = argparse.ArgumentParser(description='Run the experiment with optional parameters.')
     parser.add_argument('-so', '--segmentation_order', help='Segmentation order as a list of tuples')
     parser.add_argument('-o', '--output', help='Output file name')
+    parser.add_argument('-ad', '--audio_device', help='Audio device ID')
     args = parser.parse_args()
 
-    # Set segmentation order
     segmentation_order = get_segmentation_order(args)
 
-    # Set output file name
     if args.output:
         output_fname = args.output
     else:
@@ -85,7 +85,28 @@ try:
 
     output_fpath = os.path.join(output_fldr, output_fname)
 
-    # Configuration
+    import sounddevice as sd
+    print("Successfully imported sounddevice as sd")
+
+    print("Available audio devices:")
+    print(sd.query_devices())
+
+    prefs.hardware['audioLib'] = ['pygame', 'sounddevice', 'PTB', 'pyo'] 
+    prefs.general['audioDevice'] = ['Built-in Output']
+
+    if args.audio_device:
+        print("Available audio devices:")
+        print(sd.query_devices())
+        audio_device_id = input("Select audio device ID: ")
+        if audio_device_id.isdigit():
+            audio_device_id = int(audio_device_id)
+        else:
+            audio_device_id = 5
+    else:
+        audio_device_id = 5
+
+    prefs.hardware['audioDevice'] = [audio_device_id]
+
     visuals = {
         'VideoSegStart': ['Next activity starting soon.', 'space', True],
         
@@ -125,20 +146,16 @@ try:
 
     task_clock = core.Clock()
 
-    # Initialize display and screen
     disp = Display(disptype='psychopy')
     scr = Screen(disptype='psychopy')
     event.Mouse(visible=False)
 
-    # Initialize text stimulus
     center_text = psychopy.visual.TextStim(
         win=pygaze.expdisplay,
         text='',
         height=50,
         wrapWidth=1080
     )
-
-    # Initialize fixation cross
     fix_cross_height = 200
     fixation = psychopy.visual.TextStim(
         win=pygaze.expdisplay,
@@ -147,7 +164,6 @@ try:
         height=fix_cross_height
     )
 
-    # Initialize output dictionary
     out_dict = [['sectionname', 'onset', 'unix_epoch_time']]
 
     def display_fixation_cross(duration=2.0):
@@ -164,7 +180,6 @@ try:
         disp.fill(screen=scr)
         disp.show()
         
-        # Log trial start with specific information
         trial_start_time = task_clock.getTime()
         unix_epoch_time = time.time()
         out_dict.append([f'{visual_screen}_{mode}_{task}_start', trial_start_time, unix_epoch_time])
@@ -188,13 +203,11 @@ try:
         """Present video for its entire duration."""
         duration = movie.duration
         starttime = task_clock.getTime()
-        movie.seek(0)  # Ensure movie starts from the beginning
-        movie.play()  # Start the movie playback
+        movie.seek(0)
+        movie.play()
         
-        # Get video name
         video_name = get_video_name(movie_fname)
         
-        # Log trial start with specific information
         trial_start_time = task_clock.getTime()
         unix_epoch_time = time.time()
         out_dict.append([f'{visual_screen}_{mode}_{task}_start_{video_name}', trial_start_time, unix_epoch_time])
@@ -224,13 +237,11 @@ try:
         """Play video and listen for spacebar presses."""
         duration = movie.duration
         starttime = task_clock.getTime()
-        movie.seek(0)  # Ensure movie starts from the beginning
-        movie.play()  # Start the movie playback
-        
-        # Get video name
+        movie.seek(0) 
+        movie.play() 
+
         video_name = get_video_name(movie_fname)
         
-        # Log trial start with specific information
         trial_start_time = task_clock.getTime()
         unix_epoch_time = time.time()
         out_dict.append([f'{visual_screen}_{mode}_{task}_start_{video_name}', trial_start_time, unix_epoch_time])
@@ -280,26 +291,21 @@ try:
                 for movie_viewing_mode in segmentation_order:
                     movie_fname = os.path.join(vid_dir, vid_list[vid_ind])
                     print(movie_fname)
-                    # Initialize movie
                     try:
                         movie = psychopy.visual.MovieStim(
                             win=pygaze.expdisplay,
                             filename=movie_fname,
                             loop=False
                         )
-                        # Set desired aspect ratio
                         aspect_ratio = 3 / 2
-                        # Set desired maximum width or height
                         max_width = 1200
                         max_height = 1080
-                        # Calculate new dimensions while maintaining aspect ratio
                         if max_width / aspect_ratio <= max_height:
                             new_width = max_width
                             new_height = max_width / aspect_ratio
                         else:
                             new_height = max_height
                             new_width = max_height * aspect_ratio
-                        # Set the size of the movie
                         movie.size = (new_width, new_height)
                     except Exception as e:
                         print(f"Failed to load movie: {e}")
